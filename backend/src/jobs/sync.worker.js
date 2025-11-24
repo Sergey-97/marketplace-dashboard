@@ -43,35 +43,42 @@ async function processSyncJob(job) {
     }
 
     console.log(`✅ Синхронизация ${marketplace} завершена: ${data.length} записей`);
-    
     return { success: true, inserted: data.length };
 
   } catch (error) {
     console.error(`❌ Критическая ошибка синхронизации ${marketplace}:`, error.message);
-    throw error; // Worker автоматически повторит задачу
+    throw error;
   }
 }
 
-// Создаем worker'ов
-const syncWorker = new Worker(
-  'marketplace-sync',
-  async job => processSyncJob(job),
-  {
-    connection: redisClient || undefined,
-    concurrency: 1, // Обрабатываем по одной задаче (важно для rate limiting)
-    limiter: {
-      max: 30, // 30 задач в минуту для OZON
-      duration: 60000
+// Создаем worker'а ТОЛЬКО если есть Redis
+let syncWorker = null;
+
+if (redisClient) {
+  syncWorker = new Worker(
+    'marketplace-sync',
+    async job => processSyncJob(job),
+    {
+      connection: redisClient,
+      concurrency: 1,
+      limiter: {
+        max: 30,
+        duration: 60000
+      }
     }
-  }
-);
+  );
 
-syncWorker.on('completed', (job, result) => {
-  console.log(`✅ Задача ${job.id} завершена:`, result);
-});
+  syncWorker.on('completed', (job, result) => {
+    console.log(`✅ Задача ${job.id} завершена:`, result);
+  });
 
-syncWorker.on('failed', (job, err) => {
-  console.error(`❌ Задача ${job.id} провалена:`, err.message);
-});
+  syncWorker.on('failed', (job, err) => {
+    console.error(`❌ Задача ${job.id} провалена:`, err.message);
+  });
 
-module.exports = { syncWorker };
+  console.log('✅ Worker синхронизации запущен');
+} else {
+  console.log('⚠️  Redis не настроен, worker не запускается');
+}
+
+module.exports = { syncWorker, processSyncJob };
