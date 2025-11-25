@@ -2,27 +2,29 @@
 const Redis = require('ioredis');
 require('dotenv').config();
 
-let redisClient;
+let redisClient = null;
 
-if (process.env.REDIS_HOST && process.env.REDIS_PASSWORD) {
+if (process.env.REDIS_HOST) {
+  // Пробуем подключиться без пароля
   redisClient = new Redis({
     host: process.env.REDIS_HOST,
     port: process.env.REDIS_PORT || 6379,
-    password: process.env.REDIS_PASSWORD,
     maxRetriesPerRequest: 3,
-    lazyConnect: true
+    lazyConnect: true,
+    retryStrategy: (times) => Math.min(times * 50, 2000),
+    reconnectOnError: () => true
   });
-
-  redisClient.on('error', (err) => {
-    console.warn('⚠️  Redis error (без Redis будет работать в обход очереди):', err.message);
-  });
-
+  
   redisClient.on('connect', () => {
-    console.log('✅ Подключено к Redis');
+    console.log('✅ Подключено к Redis (без пароля)');
+  });
+  
+  redisClient.on('error', (err) => {
+    console.warn('⚠️ Redis error:', err.message);
+    redisClient = null;
   });
 } else {
-  console.log('⚠️  REDIS_HOST не настроен - очередь будет работать в памяти');
-  redisClient = null;
+  console.log('⚠️ Redis не настроен - режим памяти');
 }
 
 module.exports = redisClient;
