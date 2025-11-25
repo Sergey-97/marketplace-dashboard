@@ -4,6 +4,7 @@ const redisClient = require('../config/redis');
 const OzonAPI = require('../services/ozon.api');
 const WBAPI = require('../services/wb.api');
 const supabase = require('../config/supabase');
+const { syncQueue, useRedis } = require('./sync.queue');
 
 // Функция для обработки задачи синхронизации
 async function processSyncJob(job) {
@@ -54,7 +55,7 @@ async function processSyncJob(job) {
 // Создаем worker'а ТОЛЬКО если есть Redis
 let syncWorker = null;
 
-if (redisClient) {
+if (useRedis) {
   syncWorker = new Worker(
     'marketplace-sync',
     async job => processSyncJob(job),
@@ -78,7 +79,9 @@ if (redisClient) {
 
   console.log('✅ Worker синхронизации запущен');
 } else {
-  console.log('⚠️  Redis не настроен, worker не запускается');
+  // Use in-memory processing
+  console.log('⚠️  Redis не настроен, используем in-memory обработку');
+  syncQueue.process(async job => processSyncJob(job));
 }
 
 module.exports = { syncWorker, processSyncJob };
