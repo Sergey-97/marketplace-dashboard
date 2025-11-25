@@ -24,8 +24,8 @@ app.use(express.urlencoded({ extended: true }));
 // CORS - РАЗРЕШАЕМ Vercel и localhost
 app.use(cors({
   origin: [
-    'https://marketplace-dashboard-phi.vercel.app',  // ← Ваш текущий Vercel URL
-    'https://marketplace-dashboard-*.vercel.app',    // ← Все будущие Vercel поддомены
+    'https://marketplace-dashboard-phi.vercel.app',
+    'https://marketplace-dashboard-*.vercel.app',
     'http://localhost:3000',
     'http://localhost:10000'
   ],
@@ -34,11 +34,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// ВАЖНО: Обрабатываем preflight запросы для всех маршрутов
+// ВАЖНО: Обрабатываем preflight запросы
 app.options('*', cors());
+
+// Проверка маршрутов (для отладки)
+console.log('📍 Registering routes...');
 
 // Health check
 app.get('/health', (req, res) => {
+  console.log('✅ Health check requested');
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
@@ -51,9 +55,11 @@ app.get('/health', (req, res) => {
 
 // Основные маршруты
 app.use('/api', apiRoutes);
+console.log('✅ API routes mounted at /api');
 
 // Обработка 404
 app.use((req, res) => {
+  console.log(`❌ 404: ${req.method} ${req.url}`);
   res.status(404).json({ error: 'Endpoint not found' });
 });
 
@@ -69,6 +75,8 @@ app.use((err, req, res, next) => {
 // Запуск сервера
 async function startServer() {
   try {
+    console.log('🚀 Starting server...');
+    
     // Проверяем подключение к Supabase
     const { data, error } = await supabase.from('products').select('count').limit(1);
     if (error) {
@@ -79,6 +87,7 @@ async function startServer() {
 
     // Запускаем cron
     scheduleDailySync();
+    console.log('✅ Cron scheduler started');
     
     // Запускаем worker (если Redis есть)
     if (syncWorker) {
