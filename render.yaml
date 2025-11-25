@@ -1,15 +1,31 @@
+# render.yaml - файл в корне проекта
 services:
   - type: web
     name: marketplace-backend
     env: docker
     plan: free
     branch: main
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
     envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
+      - key: REDIS_HOST
+        fromService:
+          name: marketplace-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: marketplace-redis
+          property: port
+      - key: REDIS_PASSWORD
+        fromService:
+          name: marketplace-redis
+          property: password
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_KEY
@@ -20,9 +36,11 @@ services:
         sync: false
       - key: WB_API_KEY
         sync: false
-      - key: REDIS_HOST
-        sync: false
-      - key: REDIS_PASSWORD
-        sync: false
       - key: FRONTEND_URL
-        value: https://your-frontend.vercel.app
+        sync: false
+
+  - type: redis
+    name: marketplace-redis
+    plan: free
+    region: oregon
+    ipAllowList: []  # Внешний доступ отключен (безопасно)
