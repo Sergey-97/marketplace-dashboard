@@ -21,11 +21,21 @@ app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// CORS
+// CORS - РАЗРЕШАЕМ Vercel и localhost
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+  origin: [
+    'https://marketplace-dashboard-phi.vercel.app',  // ← Ваш текущий Vercel URL
+    'https://marketplace-dashboard-*.vercel.app',    // ← Все будущие Vercel поддомены
+    'http://localhost:3000',
+    'http://localhost:10000'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS', 'HEAD'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// ВАЖНО: Обрабатываем preflight запросы для всех маршрутов
+app.options('*', cors());
 
 // Health check
 app.get('/health', (req, res) => {
