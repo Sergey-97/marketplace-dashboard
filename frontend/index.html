@@ -1,0 +1,41 @@
+<script src="js/api.js"></script>
+<script>
+// Замените вашу старую функцию загрузки на новую
+async function loadDashboardData() {
+  const startDate = document.getElementById('startPeriod').value;
+  const endDate = document.getElementById('endPeriod').value;
+  const marketplace = document.getElementById('globalChannel').value.toLowerCase();
+
+  try {
+    showLoading();
+    
+    // Получаем продажи
+    const salesResponse = await api.getSales(startDate, endDate, { marketplace });
+    if (salesResponse.success) {
+      salesData = salesResponse.data;
+      hasSalesData = salesData.length > 0;
+    }
+
+    // Получаем товары
+    const productsResponse = await api.getProducts();
+    if (productsResponse.success) {
+      products = productsResponse.data;
+      hasProductsData = products.length > 0;
+    }
+
+    // Обновляем дашборд
+    if (hasSalesData) {
+      updateChartsAndKPI();
+    }
+
+    hideLoading();
+  } catch (error) {
+    console.error('❌ Ошибка загрузки данных:', error);
+    alert('Не удалось загрузить данные: ' + error.message);
+    hideLoading();
+  }
+}
+
+// Замените event listener
+document.getElementById('buildForecast').addEventListener('click', loadDashboardData);
+</script>
