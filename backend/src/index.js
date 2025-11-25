@@ -15,10 +15,10 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 // Middleware
-app.use(helmet()); // Безопасность
-app.use(compression()); // Сжатие
-app.use(morgan('combined')); // Логи
-app.use(express.json({ limit: '10mb' })); // Парсинг JSON
+app.use(helmet());
+app.use(compression());
+app.use(morgan('combined'));
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // CORS
@@ -73,6 +73,8 @@ async function startServer() {
     // Запускаем worker (если Redis есть)
     if (syncWorker) {
       console.log('✅ Worker синхронизации запущен');
+    } else {
+      console.log('⚠️  Worker не запущен (отсутствует Redis)');
     }
 
     // Прослушиваем порт
@@ -92,7 +94,5 @@ startServer();
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('🛑 SIGTERM получен, завершение работы...');
-  await syncQueue.close();
-  await forecastQueue.close();
   process.exit(0);
 });

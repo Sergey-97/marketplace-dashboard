@@ -1,24 +1,28 @@
 // backend/src/jobs/sync.queue.js
-const { Queue, Worker, Job } = require('bullmq');
+const { Queue } = require('bullmq');
 const redisClient = require('../config/redis');
+const MemoryQueue = require('./memory.queue');
 
-// Настройки очередей
-const queueOptions = {
-  connection: redisClient || undefined, // Если Redis нет, используем память
-  defaultJobOptions: {
-    attempts: 3, // 3 попытки
-    backoff: {
-      type: 'exponential',
-      delay: 5000 // Начальная задержка 5 сек
-    },
-    removeOnComplete: { age: 3600 }, // Удалять через час
-    removeOnFail: { age: 24 * 3600 } // Удалять через сутки
-  }
+const DEFAULT_JOB_OPTIONS = {
+  attempts: 3,
+  backoff: {
+    type: 'exponential',
+    delay: 5000
+  },
+  removeOnComplete: { age: 3600 },
+  removeOnFail: { age: 24 * 3600 }
 };
 
-// Очереди
-const syncQueue = new Queue('marketplace-sync', queueOptions);
-const forecastQueue = new Queue('forecast-generation', queueOptions);
+// Use Redis Queue if available, otherwise Memory Queue
+const useRedis = !!redisClient;
+
+const syncQueue = useRedis 
+  ? new Queue('marketplace-sync', { connection: redisClient, defaultJobOptions: DEFAULT_JOB_OPTIONS })
+  : new MemoryQueue('marketplace-sync');
+
+const forecastQueue = useRedis
+  ? new Queue('forecast-generation', { connection: redisClient, defaultJobOptions: DEFAULT_JOB_OPTIONS })
+  : new MemoryQueue('forecast-generation');
 
 // Функция добавления задачи синхронизации
 async function addSyncJob(marketplace, dateFrom, dateTo, priority = 1) {
@@ -48,5 +52,6 @@ module.exports = {
   syncQueue,
   forecastQueue,
   addSyncJob,
-  addForecastJob
+  addForecastJob,
+  useRedis // Export for conditional logic elsewhere
 };
