@@ -1,41 +1,159 @@
-<script src="js/api.js"></script>
-<script>
-// Замените вашу старую функцию загрузки на новую
-async function loadDashboardData() {
-  const startDate = document.getElementById('startPeriod').value;
-  const endDate = document.getElementById('endPeriod').value;
-  const marketplace = document.getElementById('globalChannel').value.toLowerCase();
-
-  try {
-    showLoading();
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Marketplace Dashboard</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .controls {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    input {
+      padding: 8px;
+      margin: 5px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Marketplace Dashboard</h1>
     
-    // Получаем продажи
-    const salesResponse = await api.getSales(startDate, endDate, { marketplace });
-    if (salesResponse.success) {
-      salesData = salesResponse.data;
-      hasSalesData = salesData.length > 0;
+    <!-- Controls -->
+    <div class="controls">
+      <div>
+        <label>Дата начала: <input type="date" id="startPeriod" value="2024-01-01"></label>
+        <label>Дата окончания: <input type="date" id="endPeriod" value="2024-12-31"></label>
+      </div>
+      <div>
+        <label>Маркетплейс:
+          <select id="globalChannel">
+            <option value="all">Все</option>
+            <option value="ozon">OZON</option>
+            <option value="wildberries">Wildberries</option>
+          </select>
+        </label>
+      </div>
+      <div>
+        <button id="buildForecast">📊 Загрузить данные</button>
+        <button id="syncData">🔄 Синхронизировать</button>
+        <button id="syncFull">📦 Полная синхронизация</button>
+      </div>
+      <div id="syncStatus" class="mt-2"></div>
+    </div>
+
+    <!-- Results -->
+    <div class="grid">
+      <div class="card">
+        <h3>Товары</h3>
+        <div id="productsList">Загрузите данные...</div>
+      </div>
+      <div class="card">
+        <h3>Продажи</h3>
+        <div id="salesList">Загрузите данные...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    let salesData = [];
+    let products = [];
+
+    // Загрузка данных
+    async function loadDashboardData() {
+      const startDate = document.getElementById('startPeriod').value;
+      const endDate = document.getElementById('endPeriod').value;
+      const marketplace = document.getElementById('globalChannel').value;
+
+      try {
+        // Получаем товары
+        const productsResponse = await api.getProducts();
+        if (productsResponse.success) {
+          products = productsResponse.data;
+          document.getElementById('productsList').innerHTML = 
+            `<p>✅ Загружено ${products.length} товаров</p>`;
+        }
+
+        // Получаем продажи
+        const salesResponse = await api.getSales(startDate, endDate, { marketplace });
+        if (salesResponse.success) {
+          salesData = salesResponse.data;
+          document.getElementById('salesList').innerHTML = 
+            `<p>✅ Загружено ${salesResponse.count} продаж</p>`;
+        }
+        
+      } catch (error) {
+        console.error('❌ Ошибка:', error);
+        document.getElementById('syncStatus').textContent = '❌ Ошибка: ' + error.message;
+      }
     }
 
-    // Получаем товары
-    const productsResponse = await api.getProducts();
-    if (productsResponse.success) {
-      products = productsResponse.data;
-      hasProductsData = products.length > 0;
-    }
+    // Синхронизация
+    document.getElementById('syncData').addEventListener('click', async () => {
+      const startDate = document.getElementById('startPeriod').value;
+      const endDate = document.getElementById('endPeriod').value;
+      const marketplace = document.getElementById('globalChannel').value;
 
-    // Обновляем дашборд
-    if (hasSalesData) {
-      updateChartsAndKPI();
-    }
+      document.getElementById('syncStatus').textContent = '⏳ Синхронизация...';
 
-    hideLoading();
-  } catch (error) {
-    console.error('❌ Ошибка загрузки данных:', error);
-    alert('Не удалось загрузить данные: ' + error.message);
-    hideLoading();
-  }
-}
+      try {
+        if (marketplace === 'all') {
+          await api.triggerSync('ozon', startDate, endDate);
+          await api.triggerSync('wildberries', startDate, endDate);
+        } else {
+          await api.triggerSync(marketplace, startDate, endDate);
+        }
+        
+        document.getElementById('syncStatus').textContent = '✅ Задачи добавлены в очередь';
+        
+        // Обновим данные через 5 сек
+        setTimeout(loadDashboardData, 5000);
+        
+      } catch (error) {
+        document.getElementById('syncStatus').textContent = '❌ Ошибка: ' + error.message;
+      }
+    });
 
-// Замените event listener
-document.getElementById('buildForecast').addEventListener('click', loadDashboardData);
-</script>
+    document.getElementById('buildForecast').addEventListener('click', loadDashboardData);
+  </script>
+</body>
+</html>

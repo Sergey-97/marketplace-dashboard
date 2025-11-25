@@ -4,6 +4,9 @@ class APIClient {
     this.baseURL = 'https://marketplace-dashboard-1.onrender.com';
   }
 
+  /**
+   * Получить продажи за период
+   */
   async getSales(startDate, endDate, options = {}) {
     const params = new URLSearchParams({
       startDate,
@@ -18,6 +21,9 @@ class APIClient {
     return response.json();
   }
 
+  /**
+   * Получить товары
+   */
   async getProducts(options = {}) {
     const params = new URLSearchParams(options);
     const response = await fetch(`${this.baseURL}/api/products?${params}`);
@@ -25,6 +31,9 @@ class APIClient {
     return response.json();
   }
 
+  /**
+   * Получить KPI
+   */
   async getKPI(startDate, endDate, marketplace = 'all') {
     const params = new URLSearchParams({ startDate, endDate, marketplace });
     const response = await fetch(`${this.baseURL}/api/kpi?${params}`);
@@ -32,6 +41,9 @@ class APIClient {
     return response.json();
   }
 
+  /**
+   * Запустить синхронизацию
+   */
   async triggerSync(marketplace, dateFrom, dateTo) {
     const response = await fetch(`${this.baseURL}/api/sync/trigger`, {
       method: 'POST',
