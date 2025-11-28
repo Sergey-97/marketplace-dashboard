@@ -88,10 +88,15 @@
       font-weight: 600;
       text-align: center;
       display: none;
+      animation: slideIn 0.3s ease;
     }
-    .status.loading { background: #e3f2fd; color: #1976d2; }
-    .status.success { background: #e8f5e9; color: #388e3c; }
-    .status.error { background: #ffebee; color: #d32f2f; }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .status.loading { background: #e3f2fd; color: #1976d2; border-left: 4px solid #1976d2; }
+    .status.success { background: #e8f5e9; color: #388e3c; border-left: 4px solid #388e3c; }
+    .status.error { background: #ffebee; color: #d32f2f; border-left: 4px solid #d32f2f; }
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -110,6 +115,7 @@
       font-size: 13px; 
       opacity: 0.9; 
       margin-bottom: 8px;
+      font-weight: 500;
     }
     .metric-value { 
       font-size: 32px; 
@@ -134,13 +140,16 @@
     th { 
       background: #f5f5f5; 
       font-weight: 700;
+      color: #333;
     }
     tr:hover { background: #f9f9f9; }
     .empty-state {
       text-align: center;
       color: #999;
       padding: 40px 20px;
+      font-size: 15px;
     }
+    .error-text { color: #d32f2f; font-size: 13px; margin-top: 4px; }
     h3 { color: #333; margin: 0 0 16px 0; font-size: 1.3em; }
   </style>
 </head>
@@ -236,6 +245,10 @@
       return typeof num === 'number' ? num.toLocaleString('ru-RU') : num;
     }
 
+    function formatCurrency(num) {
+      return `₽${formatNumber(Math.round(num))};`
+    }
+
     // === Load Dashboard Data ===
     async function loadDashboardData() {
       const start = document.getElementById('startPeriod').value;
@@ -264,15 +277,15 @@
           </div>
           <div class="metric">
             <div class="metric-label">Выручка</div>
-            <div class="metric-value">₽${formatNumber(Math.round(totalRevenue))}</div>
+            <div class="metric-value">${formatCurrency(totalRevenue)}</div>
           </div>
           <div class="metric">
             <div class="metric-label">Расходы</div>
-            <div class="metric-value">₽${formatNumber(Math.round(totalExpenses))}</div>
+            <div class="metric-value">${formatCurrency(totalExpenses)}</div>
           </div>
           <div class="metric">
             <div class="metric-label">Прибыль</div>
-            <div class="metric-value">₽${formatNumber(Math.round(totalProfit))}</div>
+            <div class="metric-value">${formatCurrency(totalProfit)}</div>
           </div>
         `;
         document.getElementById('metrics').innerHTML = metricsHtml;
@@ -295,7 +308,7 @@
                   <td>${o.id || '—'}</td>
                   <td>${o.order_date ? new Date(o.order_date).toLocaleDateString('ru-RU') : '—'}</td>
                   <td>${o.marketplace || '—'}</td>
-                  <td>₽${formatNumber(Math.round(o.price || 0))}</td>
+                  <td>${formatCurrency(o.price || 0)}</td>
                   <td>${o.status || '—'}</td>
                 </tr>
               `).join('')}
@@ -321,11 +334,11 @@
               ${expenses.items.slice(0, 20).map(e => `
                 <tr>
                   <td>${e.orderId || '—'}</td>
-                  <td>₽${formatNumber(Math.round(e.adSpend || 0))}</td>
-                  <td>₽${formatNumber(Math.round(e.logisticsCost || 0))}</td>
-                  <td>₽${formatNumber(Math.round(e.platformFee || 0))}</td>
-                  <td>₽${formatNumber(Math.round(e.revenue || 0))}</td>
-                  <td style="color: ${(e.profit || 0) >= 0 ? '#388e3c' : '#d32f2f'}">₽${formatNumber(Math.round(e.profit || 0))}</td>
+                  <td>${formatCurrency(e.adSpend || 0)}</td>
+                  <td>${formatCurrency(e.logisticsCost || 0)}</td>
+                  <td>${formatCurrency(e.platformFee || 0)}</td>
+                  <td>${formatCurrency(e.revenue || 0)}</td>
+                  <td style="color: ${(e.profit || 0) >= 0 ? '#388e3c' : '#d32f2f'}">${formatCurrency(e.profit || 0)}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -391,115 +404,6 @@
     // === Initialize ===
     document.getElementById('endPeriod').valueAsDate = new Date();
     window.addEventListener('DOMContentLoaded', loadDashboardData);
-  </script>
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Marketplace Dashboard</h1>
-    
-    <!-- Controls -->
-    <div class="controls">
-      <div>
-        <label>Дата начала: <input type="date" id="startPeriod" value="2024-01-01"></label>
-        <label>Дата окончания: <input type="date" id="endPeriod" value="2024-12-31"></label>
-      </div>
-      <div>
-        <label>Маркетплейс:
-          <select id="globalChannel">
-            <option value="all">Все</option>
-            <option value="ozon">OZON</option>
-            <option value="wildberries">Wildberries</option>
-          </select>
-        </label>
-      </div>
-      <div>
-        <button id="buildForecast">📊 Загрузить данные</button>
-        <button id="syncData">🔄 Синхронизировать</button>
-        <button id="syncFull">📦 Полная синхронизация</button>
-      </div>
-      <div id="syncStatus" class="mt-2"></div>
-    </div>
-
-    <!-- Results -->
-    <div class="grid">
-      <div class="card">
-        <h3>Товары</h3>
-        <div id="productsList">Загрузите данные...</div>
-      </div>
-      <div class="card">
-        <h3>Продажи</h3>
-        <div id="salesList">Загрузите данные...</div>
-      </div>
-    </div>
-  </div>
-
-  <script src="js/api.js"></script>
-  <script>
-    let salesData = [];
-    let products = [];
-
-    // Загрузка данных
-    async function loadDashboardData() {
-      const startDate = document.getElementById('startPeriod').value;
-      const endDate = document.getElementById('endPeriod').value;
-      const marketplace = document.getElementById('globalChannel').value;
-
-      try {
-        // Получаем товары
-        const productsResponse = await api.getProducts();
-        if (productsResponse.success) {
-          products = productsResponse.data;
-          document.getElementById('productsList').innerHTML = 
-            `<p>✅ Загружено ${products.length} товаров</p>`;
-        }
-
-        // Получаем продажи
-        const salesResponse = await api.getSales(startDate, endDate, { marketplace });
-        if (salesResponse.success) {
-          salesData = salesResponse.data;
-          document.getElementById('salesList').innerHTML = 
-            `<p>✅ Загружено ${salesResponse.count} продаж</p>`;
-        }
-        
-      } catch (error) {
-        console.error('❌ Ошибка:', error);
-        document.getElementById('syncStatus').textContent = '❌ Ошибка: ' + (error.message || error);
-        document.getElementById('productsList').innerHTML = '<p>❌ Ошибка загрузки товаров</p>';
-        document.getElementById('salesList').innerHTML = '<p>❌ Ошибка загрузки продаж</p>';
-      }
-    }
-
-    // Синхронизация
-    document.getElementById('syncData').addEventListener('click', async () => {
-      const startDate = document.getElementById('startPeriod').value;
-      const endDate = document.getElementById('endPeriod').value;
-      const marketplace = document.getElementById('globalChannel').value;
-
-      document.getElementById('syncStatus').textContent = '⏳ Синхронизация...';
-
-      try {
-        if (marketplace === 'all') {
-          await api.triggerSync('ozon', startDate, endDate);
-          await api.triggerSync('wildberries', startDate, endDate);
-        } else {
-          await api.triggerSync(marketplace, startDate, endDate);
-        }
-        
-        document.getElementById('syncStatus').textContent = '✅ Задачи добавлены в очередь';
-        
-        // Обновим данные через 5 сек
-        setTimeout(loadDashboardData, 5000);
-        
-      } catch (error) {
-        document.getElementById('syncStatus').textContent = '❌ Ошибка: ' + error.message;
-      }
-    });
-
-    document.getElementById('buildForecast').addEventListener('click', loadDashboardData);
   </script>
 </body>
 </html>

@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "worker": "node src/jobs/sync.worker.js",
+    "worker:dev": "nodemon src/jobs/sync.worker.js",
     "test:ozon": "node src/services/test/ozon.test.js",
     "test:wb": "node src/services/test/wb.test.js"
   },
