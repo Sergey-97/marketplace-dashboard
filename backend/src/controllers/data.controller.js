@@ -58,7 +58,7 @@ class DataController {
 
     } catch (error) {
       console.error('❌ Необработанная ошибка:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error.message, details: error }); // Добавлен details
     }
   }
 
@@ -148,7 +148,7 @@ class DataController {
       });
 
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error.message, details: error }); // Добавлен details
     }
   }
 
@@ -177,7 +177,7 @@ class DataController {
       });
 
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error.message, details: error }); // Добавлен details
     }
   }
 
@@ -203,7 +203,7 @@ class DataController {
       });
 
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error.message, details: error }); // Добавлен details
     }
   }
 
@@ -277,7 +277,84 @@ class DataController {
       });
 
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error.message, details: error }); // Добавлен details
+    }
+  }
+
+  /**
+   * Получить расширенные данные по заказам
+   * GET /api/orders?startDate=2024-01-01&endDate=2024-01-31&marketplace=all
+   */
+  async getOrders(req, res) {
+    try {
+      const { startDate, endDate, marketplace = 'all', article = null } = req.query;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: 'startDate и endDate обязательны' });
+      }
+      let query = supabase
+        .from('sales_fact')
+        .select('order_id, article, sku, product_name, marketplace, quantity, price, total_amount, order_date, channel, commission, paid_by_customer, co_investment_price, warehouse_from, warehouse_to, stock_wb, stock_ozon, status')
+        .gte('order_date', `${startDate}T00:00:00`)
+        .lte('order_date', `${endDate}T23:59:59`);
+      if (marketplace !== 'all') {
+        query = query.eq('marketplace', marketplace);
+      }
+      if (article) {
+        query = query.eq('article', article);
+      }
+      query = query.order('order_date', { ascending: true });
+      const { data, error } = await query;
+      if (error) {
+        console.error('❌ Ошибка получения заказов:', error);
+        return res.status(500).json({ error: error.message, details: error });
+      }
+      res.json({ success: true, orders: data, count: data.length });
+    } catch (error) {
+      console.error('❌ Необработанная ошибка:', error);
+      res.status(500).json({ error: error.message, details: error });
+    }
+  }
+
+  /**
+   * Получить расходы по заказам и рекламе, а также воронку продаж
+   * GET /api/order-expenses?startDate=2024-01-01&endDate=2024-01-31&marketplace=all
+   */
+  async getOrderExpenses(req, res) {
+    try {
+      const { startDate, endDate, marketplace = 'all', article = null } = req.query;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: 'startDate и endDate обязательны' });
+      }
+      // Предполагается, что в sales_fact есть поля: ad_spend, logistics_cost, platform_fee, funnel_stage
+      let query = supabase
+        .from('sales_fact')
+        .select('order_id, article, marketplace, order_date, ad_spend, logistics_cost, platform_fee, funnel_stage, total_amount')
+        .gte('order_date', `${startDate}T00:00:00`)
+        .lte('order_date', `${endDate}T23:59:59`);
+      if (marketplace !== 'all') {
+        query = query.eq('marketplace', marketplace);
+      }
+      if (article) {
+        query = query.eq('article', article);
+      }
+      query = query.order('order_date', { ascending: true });
+      const { data, error } = await query;
+      if (error) {
+        console.error('❌ Ошибка получения расходов по заказам:', error);
+        return res.status(500).json({ error: error.message, details: error });
+      }
+      // Агрегация по стадиям воронки
+      const funnel = {};
+      data.forEach(item => {
+        const stage = item.funnel_stage || 'unknown';
+        if (!funnel[stage]) funnel[stage] = { count: 0, revenue: 0 };
+        funnel[stage].count++;
+        funnel[stage].revenue += item.total_amount || 0;
+      });
+      res.json({ success: true, expenses: data, funnel });
+    } catch (error) {
+      console.error('❌ Необработанная ошибка:', error);
+      res.status(500).json({ error: error.message, details: error });
     }
   }
 }
