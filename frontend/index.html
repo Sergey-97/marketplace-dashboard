@@ -123,7 +123,9 @@
         
       } catch (error) {
         console.error('❌ Ошибка:', error);
-        document.getElementById('syncStatus').textContent = '❌ Ошибка: ' + error.message;
+        document.getElementById('syncStatus').textContent = '❌ Ошибка: ' + (error.message || error);
+        document.getElementById('productsList').innerHTML = '<p>❌ Ошибка загрузки товаров</p>';
+        document.getElementById('salesList').innerHTML = '<p>❌ Ошибка загрузки продаж</p>';
       }
     }
 

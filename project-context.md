@@ -169,3 +169,22 @@ sync.worker.js - обработчики
 sync.cron.js - планировщик
 
 initial-loader.js - загрузка истории
+## Текущий этап: Этап 7 - Адаптация HTML дашборда ✓
+
+### Деплой:
+- Backend: https://marketplace-dashboard-1.onrender.com ✓
+- Frontend: https://marketplace-dashboard-frontend.vercel.app ✓
+- Supabase: https://your-project.supabase.co ✓
+
+### Проверка:
+1. Backend health: ✅ Проходит
+2. Frontend: ✅ Дашборд доступен
+3. API: ✅ Работает
+4. Синхронизация: ✅ Задачи добавляются
+
+### Команды для теста:
+# Backend health
+curl https://marketplace-dashboard-1.onrender.com/health
+
+# Frontend
+open https://marketplace-dashboard-frontend.vercel.app

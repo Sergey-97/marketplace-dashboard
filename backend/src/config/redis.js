@@ -5,10 +5,11 @@ require('dotenv').config();
 let redisClient = null;
 
 if (process.env.REDIS_HOST) {
-  // Пробуем подключиться без пароля
+  // Пробуем подключиться с использованием пароля, если он указан
   redisClient = new Redis({
     host: process.env.REDIS_HOST,
     port: process.env.REDIS_PORT || 6379,
+    password: process.env.REDIS_PASSWORD || undefined, // Добавлено использование пароля
     maxRetriesPerRequest: 3,
     lazyConnect: true,
     retryStrategy: (times) => Math.min(times * 50, 2000),
@@ -16,7 +17,7 @@ if (process.env.REDIS_HOST) {
   });
   
   redisClient.on('connect', () => {
-    console.log('✅ Подключено к Redis (без пароля)');
+    console.log('✅ Подключено к Redis (с использованием пароля, если указан)');
   });
   
   redisClient.on('error', (err) => {
