@@ -1,0 +1,37 @@
+name: Scheduled Daily Sync
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # daily at 03:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  daily-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare dates
+        id: dates
+        run: |
+          START_DATE=$(date -d "yesterday" '+%Y-%m-%d')
+          END_DATE=$(date '+%Y-%m-%d')
+          echo "START_DATE=${START_DATE}" >> $GITHUB_OUTPUT
+          echo "END_DATE=${END_DATE}" >> $GITHUB_OUTPUT
+
+      - name: Call backend sync endpoint
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          SYNC_SECRET: ${{ secrets.SYNC_SECRET }}
+        run: |
+          if [ -z "$BACKEND_URL" ]; then
+            echo "ERROR: BACKEND_URL secret is not set"; exit 1;
+          fi
+
+          echo "Triggering sync for all marketplaces: ${START_DATE} -> ${END_DATE}"
+
+          curl --fail -X POST "$BACKEND_URL/api/sync/trigger" \
+            -H 'Content-Type: application/json' \
+            -d "{\"marketplace\":\"all\",\"startDate\":\"${{ steps.dates.outputs.START_DATE }}\",\"endDate\":\"${{ steps.dates.outputs.END_DATE }}\"}" \
+            -sS
+
+      - name: Success log
+        run: echo "Scheduled sync triggered successfully"
