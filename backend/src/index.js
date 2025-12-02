@@ -152,6 +152,26 @@ app.get('/health', (req, res) => {
 
 app.use('/api', apiRoutes);
 
+// Debug: логируем зарегистрированные маршруты для быстрой проверки в логах Render
+try {
+  const listRoutes = () => {
+    const routes = [];
+    app._router.stack.forEach(mw => {
+      if (mw.route && mw.route.path) {
+        routes.push(mw.route.path);
+      } else if (mw.name === 'router' && mw.handle && mw.handle.stack) {
+        mw.handle.stack.forEach(r => {
+          if (r.route && r.route.path) routes.push('/api' + r.route.path);
+        });
+      }
+    });
+    console.log('📦 Registered routes:', routes);
+  };
+  listRoutes();
+} catch (e) {
+  console.warn('⚠️ Не удалось вывести список маршрутов:', e.message);
+}
+
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
