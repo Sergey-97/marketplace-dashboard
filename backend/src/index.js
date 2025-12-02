@@ -116,6 +116,22 @@ app.use((req, res, next) => {
   return next();
 });
 
+// FINAL middleware: ensure Access-Control-Allow-Origin echoes request origin
+// This will overwrite any previous value and is safe for development/previews.
+app.use((req, res, next) => {
+  try {
+    const origin = req.headers.origin || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+    res.setHeader('Vary', 'Origin');
+  } catch (e) {
+    // ignore
+  }
+  next();
+});
+
 app.get('/', (req, res) => {
   res.json({
     service: 'Marketplace Dashboard API',
