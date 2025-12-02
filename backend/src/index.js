@@ -59,6 +59,20 @@ const corsOptions = {
     // If the incoming origin matches any allowed variant — allow
     if (allowedOrigins.has(origin)) return callback(null, true);
 
+    // Allow Vercel preview domains (different preview URLs per branch)
+    try {
+      const lower = origin.toLowerCase();
+      if (/\.vercel\.app(:\d+)?$/.test(lower)) {
+        return callback(null, true);
+      }
+      // Allow localhost origins for local testing
+      if (/localhost(:\d+)?$/.test(lower)) {
+        return callback(null, true);
+      }
+    } catch (e) {
+      // ignore
+    }
+
     // Also allow if stripped origin (without protocol) matches configured raw entry
     const stripped = origin.replace(/^https?:\/\//i, '');
     if (rawOrigins.includes(stripped)) return callback(null, true);
