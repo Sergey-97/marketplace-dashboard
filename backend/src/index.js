@@ -25,19 +25,44 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // === Улучшенная CORS конфигурация ===
+// Поддерживаем значения как с протоколом (https://...), так и без него (example.com)
 const rawOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || '')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
 
-console.log('✅ CORS Origins:', rawOrigins.length ? rawOrigins : 'all (development)');
+// Нормализуем: для каждого значения добавляем вариант с https:// если протокол не указан
+const normalize = o => {
+  if (!o) return null;
+  if (o.startsWith('http://') || o.startsWith('https://')) return o;
+  return `https://${o}`;
+};
+
+const allowedOrigins = new Set();
+rawOrigins.forEach(o => {
+  const n = normalize(o);
+  allowedOrigins.add(o);
+  if (n) allowedOrigins.add(n);
+});
+
+console.log('✅ CORS Origins (raw):', rawOrigins.length ? rawOrigins : 'all (development)');
+console.log('✅ CORS Origins (normalized):', Array.from(allowedOrigins).length ? Array.from(allowedOrigins) : 'all (development)');
 
 const corsOptions = {
   origin: function(origin, callback) {
-    if (!origin) return callback(null, true); // curl/postman без Origin
-    if (rawOrigins.length === 0 || rawOrigins.includes(origin)) {
-      return callback(null, true);
-    }
+    // Allow requests with no origin (curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    // If no origins configured — allow all (development fallback)
+    if (allowedOrigins.size === 0) return callback(null, true);
+
+    // If the incoming origin matches any allowed variant — allow
+    if (allowedOrigins.has(origin)) return callback(null, true);
+
+    // Also allow if stripped origin (without protocol) matches configured raw entry
+    const stripped = origin.replace(/^https?:\/\//i, '');
+    if (rawOrigins.includes(stripped)) return callback(null, true);
+
     console.warn('⚠️ CORS blocked:', origin);
     callback(new Error('CORS: Origin not allowed'));
   },
