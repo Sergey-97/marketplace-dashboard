@@ -89,6 +89,33 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
+// Middleware: explicitly echo allowed Origin to ensure Access-Control-Allow-Origin
+app.use((req, res, next) => {
+  try {
+    const origin = req.headers.origin;
+    if (!origin) return next();
+
+    // reuse same checks as corsOptions
+    const lower = origin.toLowerCase();
+    if (allowedOrigins.size === 0 || allowedOrigins.has(origin) || rawOrigins.includes(origin) || rawOrigins.includes(origin.replace(/^https?:\/\//i, '')) ) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Vary', 'Origin');
+      return next();
+    }
+
+    if (/\.vercel\.app(:\d+)?$/.test(lower) || /localhost(:\d+)?$/.test(lower)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Vary', 'Origin');
+      return next();
+    }
+  } catch (e) {
+    // ignore
+  }
+  return next();
+});
+
 app.get('/', (req, res) => {
   res.json({
     service: 'Marketplace Dashboard API',
