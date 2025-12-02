@@ -10,10 +10,16 @@ if (process.env.REDIS_HOST) {
     host: process.env.REDIS_HOST,
     port: process.env.REDIS_PORT || 6379,
     password: process.env.REDIS_PASSWORD || undefined, // Добавлено использование пароля
-    maxRetriesPerRequest: 3,
-    lazyConnect: true,
+    // BullMQ requires maxRetriesPerRequest === null
+    maxRetriesPerRequest: null,
+    // Не используем lazyConnect, подключаемся сразу чтобы BullMQ получил готовый клиент
+    lazyConnect: false,
+    // Настройка повторного подключения
     retryStrategy: (times) => Math.min(times * 50, 2000),
-    reconnectOnError: () => true
+    reconnectOnError: (err) => {
+      // по умолчанию пробуем переподключиться при сетевых ошибках
+      return true;
+    }
   });
   
   redisClient.on('connect', () => {
