@@ -312,7 +312,7 @@ class DataController {
       const errorText = typeof error === 'string' ? error : (error && (error.message || error.details || JSON.stringify(error))) || '';
       if (error && /does not exist|undefined column|column .* does not exist/i.test(errorText)) {
         console.warn('⚠️ Некоторые поля в sales_fact отсутствуют, выполняем fallback-select:', errorText);
-        const safeSelect = 'order_id, article, sku, product_name, marketplace, quantity, price, total_amount, order_date, channel, commission, co_investment_price, warehouse_from, warehouse_to, stock_wb, stock_ozon, status';
+        const safeSelect = 'order_id, article, sku, product_name, marketplace, quantity, price, total_amount, order_date, channel, commission, warehouse_from, warehouse_to, stock_wb, stock_ozon, status';
         let q2 = supabase.from('sales_fact').select(safeSelect);
         q2 = baseWhere(q2);
         if (marketplace !== 'all') q2 = q2.eq('marketplace', marketplace);
@@ -325,8 +325,8 @@ class DataController {
         }
         data = res2.data || [];
 
-        // Приведём результат к ожидаемой структуре: добавим paid_by_customer с дефолтным значением
-        data = data.map(item => ({ paid_by_customer: 0, ...item }));
+        // Приведём результат к ожидаемой структуре: добавим поля с дефолтными значениями
+        data = data.map(item => ({ paid_by_customer: 0, co_investment_price: 0, ...item }));
       } else if (error) {
         console.error('❌ Ошибка получения заказов:', errorText);
         return res.status(500).json({ error: errorText || error, details: error });
