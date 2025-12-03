@@ -80,3 +80,6 @@ if (redisClient) {
 }
 
 module.exports = { syncWorker };
+
+// Экспорт processSyncJob для возможности in-process fallback
+module.exports.processSyncJob = processSyncJob;

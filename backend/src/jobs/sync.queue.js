@@ -48,13 +48,25 @@ async function addSyncJob(marketplace, dateFrom, dateTo, priority = 1) {
     if (prevJob) await prevJob.remove();
   }
 
-  const job = await syncQueue.add(`sync-${marketplace}`, 
-    { marketplace, dateFrom, dateTo }, 
-    { priority, jobId }
-  );
-
-  console.log(`📋 Добавлена задача: ${job.id}`);
-  return job;
+  try {
+    const job = await syncQueue.add(`sync-${marketplace}`,
+      { marketplace, dateFrom, dateTo },
+      { priority, jobId }
+    );
+    console.log(`📋 Добавлена задача: ${job.id}`);
+    return job;
+  } catch (err) {
+    console.error('❌ Не удалось добавить задачу в очередь, выполняем in-process fallback:', err && (err.message || err));
+    // Попытка выполнить синхронизацию немедленно как fallback
+    try {
+      const { processSyncJob } = require('./sync.worker');
+      const result = await processSyncJob({ data: { marketplace, dateFrom, dateTo } });
+      return { id: `fallback-${Date.now()}`, result };
+    } catch (innerErr) {
+      console.error('❌ Fallback sync failed:', innerErr && (innerErr.message || innerErr));
+      throw innerErr || err;
+    }
+  }
 }
 
 module.exports = { syncQueue, forecastQueue, addSyncJob };
