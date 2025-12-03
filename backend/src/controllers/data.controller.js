@@ -293,8 +293,8 @@ class DataController {
       }
       const baseWhere = (q) => q.gte('order_date', `${startDate}T00:00:00`).lte('order_date', `${endDate}T23:59:59`);
 
-      // Убираем потенциально отсутствующие колонки из основного селекта
-      const fullSelect = 'order_id, article, sku, product_name, marketplace, quantity, price, total_amount, order_date, channel, commission, warehouse_from, warehouse_to, stock_wb, stock_ozon, status';
+      // Используем общий селект '*' чтобы не перечислять колонки, которые могут отсутствовать в разных схемах
+      const fullSelect = '*';
       let data, error;
 
       // Попытка выполнить запрос с полным набором полей
@@ -333,8 +333,28 @@ class DataController {
         return res.status(500).json({ error: errorText || error, details: error });
       }
 
-      // Гарантируем наличие ожидаемых полей в ответе
-      const normalized = (data || []).map(item => ({ paid_by_customer: item.paid_by_customer || 0, co_investment_price: item.co_investment_price || 0, ...item }));
+      // Нормализуем результат: оставляем только ожидаемые поля и подставляем дефолты
+      const normalized = (data || []).map(item => ({
+        order_id: item.order_id || item.id || null,
+        article: item.article || null,
+        sku: item.sku || null,
+        product_name: item.product_name || null,
+        marketplace: item.marketplace || null,
+        quantity: item.quantity || 0,
+        price: item.price || item.total_amount || 0,
+        total_amount: item.total_amount || 0,
+        order_date: item.order_date || null,
+        channel: item.channel || null,
+        commission: item.commission || 0,
+        paid_by_customer: item.paid_by_customer || 0,
+        co_investment_price: item.co_investment_price || 0,
+        warehouse_from: item.warehouse_from || null,
+        warehouse_to: item.warehouse_to || null,
+        stock_wb: item.stock_wb || 0,
+        stock_ozon: item.stock_ozon || 0,
+        status: item.status || null
+      }));
+
       res.json({ success: true, orders: normalized, count: normalized.length });
     } catch (error) {
       console.error('❌ Необработанная ошибка:', error);
