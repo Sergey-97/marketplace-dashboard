@@ -329,8 +329,13 @@ class DataController {
         // Приведём результат к ожидаемой структуре: добавим поля с дефолтными значениями
         data = data.map(item => ({ paid_by_customer: 0, co_investment_price: 0, ...item }));
       } else if (error) {
-        console.error('❌ Ошибка получения заказов:', errorText);
-        return res.status(500).json({ error: errorText || error, details: error });
+        const errText2 = typeof error === 'string' ? error : (error && (error.message || error.details || JSON.stringify(error))) || '';
+        if (/does not exist|undefined column|column .* does not exist/i.test(errText2)) {
+          console.warn('⚠️ Некритичная ошибка структуры sales_fact, возвращаем пустой набор:', errText2);
+          return res.json({ success: true, orders: [], count: 0, warning: 'Missing sales_fact columns: some fields unavailable' });
+        }
+        console.error('❌ Ошибка получения заказов:', errText2);
+        return res.status(500).json({ error: errText2 || error, details: error });
       }
 
       // Нормализуем результат: оставляем только ожидаемые поля и подставляем дефолты
