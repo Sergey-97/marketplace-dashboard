@@ -177,11 +177,29 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('❌ Необработанная ошибка:', err.stack);
-  res.status(500).json({ 
+  console.error('❌ Необработанная ошибка:', err && (err.stack || err));
+  // If caller provided correct sync secret, include stack for faster debugging (temporary)
+  const provided = (req && (req.headers['x-sync-secret'] || req.headers['x-sync-token'])) || '';
+  const allowed = process.env.SYNC_SECRET && process.env.SYNC_SECRET.trim().length > 0;
+  const includeStack = allowed && provided && provided === process.env.SYNC_SECRET;
+
+  const body = {
     error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
-  });
+    message: process.env.NODE_ENV === 'development' ? (err && err.message) : 'Something went wrong'
+  };
+  if (includeStack) body.stack = err && (err.stack || String(err));
+
+  res.status(500).json(body);
+});
+
+// Global process-level handlers to capture unhandled errors and log them
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason && (reason.stack || reason));
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err && (err.stack || err));
+  // do not exit in production immediately; let process manager handle restarts
 });
 
 async function startServer() {
