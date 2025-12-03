@@ -90,23 +90,25 @@ router.post('/sync/trigger', async (req, res) => {
       }
     }
 
-    // Попытаемся добавить задачу, но не блокируемся на ошибке
-    let jobId = `sync-${Date.now()}`;
-    try {
-      const job = await addSyncJob(marketplace, from, to);
-      jobId = job && job.id ? job.id : jobId;
-    } catch (err) {
-      console.error('⚠️ Could not add to queue, will retry or use fallback:', err && (err.message || err));
-    }
-
-    // Возвращаем успех в любом случае
-    res.json({ 
+    // Respond immediately so caller never gets a 5xx due to queue issues
+    const jobId = `sync-${Date.now()}`;
+    res.status(202).json({ 
       success: true, 
       jobId, 
       dateFrom: from, 
       dateTo: to, 
       message: 'Sync request accepted (processing in background)' 
     });
+
+    // Fire-and-forget: add job in background, log errors server-side
+    (async () => {
+      try {
+        const job = await addSyncJob(marketplace, from, to);
+        console.log('✅ addSyncJob background result:', job && job.id ? job.id : job);
+      } catch (err) {
+        console.error('⚠️ Background addSyncJob failed:', err && (err.stack || err));
+      }
+    })();
   } catch (error) {
     console.error('❌ Error in /sync/trigger:', error && (error.stack || error));
     const errorMessage = typeof error === 'string' ? error : (error && error.message) || 'Unknown error';
