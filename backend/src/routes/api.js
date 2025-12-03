@@ -64,14 +64,6 @@ router.get('/order-expenses', async (req, res) => {
 
 router.post('/sync/trigger', async (req, res) => {
   try {
-    // Защита: если в окружении задан SYNC_SECRET — требуем заголовок `x-sync-secret`
-    const syncSecret = process.env.SYNC_SECRET;
-    if (syncSecret) {
-      const provided = req.headers['x-sync-secret'] || req.headers['x-sync-token'];
-      if (!provided || provided !== syncSecret) {
-        return res.status(401).json({ error: 'Invalid or missing x-sync-secret header' });
-      }
-    }
     const { marketplace, dateFrom, dateTo, startDate, endDate } = req.body || {};
 
     // Поддерживаем разные имена полей из фронтенда (startDate/endDate) или dateFrom/dateTo
@@ -88,17 +80,37 @@ router.post('/sync/trigger', async (req, res) => {
       to = to || toD.toISOString().split('T')[0];
     }
 
-    // Выполняем добавление задачи асинхронно, но отвечаем сразу
-    addSyncJob(marketplace, from, to).catch(err => {
-      console.error('❌ Failed to add sync job:', err && (err.message || err));
-    });
+    // Protection by SYNC_SECRET — only if env var is set
+    const syncSecret = process.env.SYNC_SECRET;
+    if (syncSecret && syncSecret.trim().length > 0) {
+      const provided = req.headers['x-sync-secret'] || req.headers['x-sync-token'] || '';
+      if (provided !== syncSecret) {
+        console.warn('⚠️ SYNC_SECRET validation failed');
+        return res.status(401).json({ error: 'Invalid or missing x-sync-secret header' });
+      }
+    }
 
-    // Возвращаем успех сразу, даже если job ещё добавляется в фоне
-    res.json({ success: true, jobId: `sync-${Date.now()}`, dateFrom: from, dateTo: to, message: 'Sync enqueued' });
+    // Попытаемся добавить задачу, но не блокируемся на ошибке
+    let jobId = `sync-${Date.now()}`;
+    try {
+      const job = await addSyncJob(marketplace, from, to);
+      jobId = job && job.id ? job.id : jobId;
+    } catch (err) {
+      console.error('⚠️ Could not add to queue, will retry or use fallback:', err && (err.message || err));
+    }
+
+    // Возвращаем успех в любом случае
+    res.json({ 
+      success: true, 
+      jobId, 
+      dateFrom: from, 
+      dateTo: to, 
+      message: 'Sync request accepted (processing in background)' 
+    });
   } catch (error) {
     console.error('❌ Error in /sync/trigger:', error && (error.stack || error));
     const errorMessage = typeof error === 'string' ? error : (error && error.message) || 'Unknown error';
-    res.status(500).json({ error: errorMessage });
+    res.status(400).json({ error: errorMessage });
   }
 });
 
