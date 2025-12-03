@@ -7,6 +7,14 @@ const { loadAllHistory } = require('../utils/initial-loader');
 // Исправлено: async/await и обработка ошибок
 router.get('/sales', async (req, res) => {
   try {
+    // Защита: если в окружении задан SYNC_SECRET — требуем заголовок `x-sync-secret`
+    const syncSecret = process.env.SYNC_SECRET;
+    if (syncSecret) {
+      const provided = req.headers['x-sync-secret'] || req.headers['x-sync-token'];
+      if (!provided || provided !== syncSecret) {
+        return res.status(401).json({ error: 'Invalid or missing x-sync-secret header' });
+      }
+    }
     await DataController.getSales(req, res);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -63,12 +71,24 @@ router.get('/order-expenses', async (req, res) => {
 
 router.post('/sync/trigger', async (req, res) => {
   try {
-    const { marketplace, dateFrom, dateTo } = req.body;
-    if (!dateFrom || !dateTo) {
-      return res.status(400).json({ error: 'dateFrom и dateTo обязательны' });
+    const { marketplace, dateFrom, dateTo, startDate, endDate } = req.body || {};
+
+    // Поддерживаем разные имена полей из фронтенда (startDate/endDate) или dateFrom/dateTo
+    let from = dateFrom || startDate;
+    let to = dateTo || endDate;
+
+    // Если даты не переданы — используем дефолт: последние 7 дней
+    if (!from || !to) {
+      const now = new Date();
+      const toD = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const fromD = new Date(toD);
+      fromD.setDate(fromD.getDate() - 7);
+      from = from || fromD.toISOString().split('T')[0];
+      to = to || toD.toISOString().split('T')[0];
     }
-    const job = await addSyncJob(marketplace, dateFrom, dateTo);
-    res.json({ success: true, jobId: job.id });
+
+    const job = await addSyncJob(marketplace, from, to);
+    res.json({ success: true, jobId: job.id, dateFrom: from, dateTo: to });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

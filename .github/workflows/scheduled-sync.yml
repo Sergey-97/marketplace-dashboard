@@ -28,8 +28,10 @@ jobs:
 
           echo "Triggering sync for all marketplaces: ${START_DATE} -> ${END_DATE}"
 
+          # Передаём SYNC_SECRET в заголовке (если задан как secret)
           curl --fail -X POST "$BACKEND_URL/api/sync/trigger" \
             -H 'Content-Type: application/json' \
+            -H "x-sync-secret: $SYNC_SECRET" \
             -d "{\"marketplace\":\"all\",\"startDate\":\"${{ steps.dates.outputs.START_DATE }}\",\"endDate\":\"${{ steps.dates.outputs.END_DATE }}\"}" \
             -sS
 

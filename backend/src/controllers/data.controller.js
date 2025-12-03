@@ -291,24 +291,48 @@ class DataController {
       if (!startDate || !endDate) {
         return res.status(400).json({ error: 'startDate и endDate обязательны' });
       }
-      let query = supabase
-        .from('sales_fact')
-        .select('order_id, article, sku, product_name, marketplace, quantity, price, total_amount, order_date, channel, commission, paid_by_customer, co_investment_price, warehouse_from, warehouse_to, stock_wb, stock_ozon, status')
-        .gte('order_date', `${startDate}T00:00:00`)
-        .lte('order_date', `${endDate}T23:59:59`);
-      if (marketplace !== 'all') {
-        query = query.eq('marketplace', marketplace);
+      const baseWhere = (q) => q.gte('order_date', `${startDate}T00:00:00`).lte('order_date', `${endDate}T23:59:59`);
+
+      const fullSelect = 'order_id, article, sku, product_name, marketplace, quantity, price, total_amount, order_date, channel, commission, paid_by_customer, co_investment_price, warehouse_from, warehouse_to, stock_wb, stock_ozon, status';
+      let data, error;
+
+      // Попытка выполнить запрос с полным набором полей
+      try {
+        let q = supabase.from('sales_fact').select(fullSelect);
+        q = baseWhere(q);
+        if (marketplace !== 'all') q = q.eq('marketplace', marketplace);
+        if (article) q = q.eq('article', article);
+        q = q.order('order_date', { ascending: true });
+        ({ data, error } = await q);
+      } catch (e) {
+        error = e;
       }
-      if (article) {
-        query = query.eq('article', article);
+
+      // Если ошибка связана с отсутствием колонок — попробуем безопасный селект без проблемных полей
+      const errorText = typeof error === 'string' ? error : (error && (error.message || error.details || JSON.stringify(error))) || '';
+      if (error && /does not exist|undefined column|column .* does not exist/i.test(errorText)) {
+        console.warn('⚠️ Некоторые поля в sales_fact отсутствуют, выполняем fallback-select:', errorText);
+        const safeSelect = 'order_id, article, sku, product_name, marketplace, quantity, price, total_amount, order_date, channel, commission, co_investment_price, warehouse_from, warehouse_to, stock_wb, stock_ozon, status';
+        let q2 = supabase.from('sales_fact').select(safeSelect);
+        q2 = baseWhere(q2);
+        if (marketplace !== 'all') q2 = q2.eq('marketplace', marketplace);
+        if (article) q2 = q2.eq('article', article);
+        q2 = q2.order('order_date', { ascending: true });
+        const res2 = await q2;
+        if (res2.error) {
+          console.error('❌ Ошибка получения заказов (fallback):', res2.error);
+          return res.status(500).json({ error: res2.error.message || res2.error, details: res2.error });
+        }
+        data = res2.data || [];
+
+        // Приведём результат к ожидаемой структуре: добавим paid_by_customer с дефолтным значением
+        data = data.map(item => ({ paid_by_customer: 0, ...item }));
+      } else if (error) {
+        console.error('❌ Ошибка получения заказов:', errorText);
+        return res.status(500).json({ error: errorText || error, details: error });
       }
-      query = query.order('order_date', { ascending: true });
-      const { data, error } = await query;
-      if (error) {
-        console.error('❌ Ошибка получения заказов:', error);
-        return res.status(500).json({ error: error.message, details: error });
-      }
-      res.json({ success: true, orders: data, count: data.length });
+
+      res.json({ success: true, orders: data || [], count: (data || []).length });
     } catch (error) {
       console.error('❌ Необработанная ошибка:', error);
       res.status(500).json({ error: error.message, details: error });
@@ -326,32 +350,52 @@ class DataController {
         return res.status(400).json({ error: 'startDate и endDate обязательны' });
       }
       // Предполагается, что в sales_fact есть поля: ad_spend, logistics_cost, platform_fee, funnel_stage
-      let query = supabase
-        .from('sales_fact')
-        .select('order_id, article, marketplace, order_date, ad_spend, logistics_cost, platform_fee, funnel_stage, total_amount')
-        .gte('order_date', `${startDate}T00:00:00`)
-        .lte('order_date', `${endDate}T23:59:59`);
-      if (marketplace !== 'all') {
-        query = query.eq('marketplace', marketplace);
+      const baseWhere = (q) => q.gte('order_date', `${startDate}T00:00:00`).lte('order_date', `${endDate}T23:59:59`);
+
+      const fullSelect = 'order_id, article, marketplace, order_date, ad_spend, logistics_cost, platform_fee, funnel_stage, total_amount';
+      let data, error;
+
+      try {
+        let q = supabase.from('sales_fact').select(fullSelect);
+        q = baseWhere(q);
+        if (marketplace !== 'all') q = q.eq('marketplace', marketplace);
+        if (article) q = q.eq('article', article);
+        q = q.order('order_date', { ascending: true });
+        ({ data, error } = await q);
+      } catch (e) {
+        error = e;
       }
-      if (article) {
-        query = query.eq('article', article);
+
+      const errorText2 = typeof error === 'string' ? error : (error && (error.message || error.details || JSON.stringify(error))) || '';
+      if (error && /does not exist|undefined column|column .* does not exist/i.test(errorText2)) {
+        console.warn('⚠️ Некоторые поля в sales_fact отсутствуют (ad_spend/logistics_cost/platform_fee/funnel_stage). Выполняем fallback-select.', errorText2);
+        const safeSelect = 'order_id, article, marketplace, order_date, total_amount';
+        let q2 = supabase.from('sales_fact').select(safeSelect);
+        q2 = baseWhere(q2);
+        if (marketplace !== 'all') q2 = q2.eq('marketplace', marketplace);
+        if (article) q2 = q2.eq('article', article);
+        q2 = q2.order('order_date', { ascending: true });
+        const res2 = await q2;
+        if (res2.error) {
+          const res2Text = typeof res2.error === 'string' ? res2.error : (res2.error.message || JSON.stringify(res2.error));
+          console.error('❌ Ошибка получения расходов (fallback):', res2Text);
+          return res.status(500).json({ error: res2Text || res2.error, details: res2.error });
+        }
+        data = (res2.data || []).map(item => ({ ad_spend: 0, logistics_cost: 0, platform_fee: 0, funnel_stage: 'unknown', ...item }));
+      } else if (error) {
+        console.error('❌ Ошибка получения расходов по заказам:', errorText2 || error);
+        return res.status(500).json({ error: errorText2 || error, details: error });
       }
-      query = query.order('order_date', { ascending: true });
-      const { data, error } = await query;
-      if (error) {
-        console.error('❌ Ошибка получения расходов по заказам:', error);
-        return res.status(500).json({ error: error.message, details: error });
-      }
+
       // Агрегация по стадиям воронки
       const funnel = {};
-      data.forEach(item => {
+      (data || []).forEach(item => {
         const stage = item.funnel_stage || 'unknown';
         if (!funnel[stage]) funnel[stage] = { count: 0, revenue: 0 };
         funnel[stage].count++;
         funnel[stage].revenue += item.total_amount || 0;
       });
-      res.json({ success: true, expenses: data, funnel });
+      res.json({ success: true, expenses: data || [], funnel });
     } catch (error) {
       console.error('❌ Необработанная ошибка:', error);
       res.status(500).json({ error: error.message, details: error });
