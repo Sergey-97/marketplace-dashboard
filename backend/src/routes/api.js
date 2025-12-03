@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const DataController = require('../controllers/data.controller');
-const { addSyncJob, runFullSync } = require('../jobs/sync.cron');
+const { addSyncJob } = require('../jobs/sync.queue');
+const { scheduleDailySync, runFullSync } = require('../jobs/sync.cron');
 const { loadAllHistory } = require('../utils/initial-loader');
 
 // Исправлено: async/await и обработка ошибок
