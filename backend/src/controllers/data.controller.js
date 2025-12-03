@@ -293,7 +293,8 @@ class DataController {
       }
       const baseWhere = (q) => q.gte('order_date', `${startDate}T00:00:00`).lte('order_date', `${endDate}T23:59:59`);
 
-      const fullSelect = 'order_id, article, sku, product_name, marketplace, quantity, price, total_amount, order_date, channel, commission, paid_by_customer, co_investment_price, warehouse_from, warehouse_to, stock_wb, stock_ozon, status';
+      // Убираем потенциально отсутствующие колонки из основного селекта
+      const fullSelect = 'order_id, article, sku, product_name, marketplace, quantity, price, total_amount, order_date, channel, commission, warehouse_from, warehouse_to, stock_wb, stock_ozon, status';
       let data, error;
 
       // Попытка выполнить запрос с полным набором полей
@@ -332,7 +333,9 @@ class DataController {
         return res.status(500).json({ error: errorText || error, details: error });
       }
 
-      res.json({ success: true, orders: data || [], count: (data || []).length });
+      // Гарантируем наличие ожидаемых полей в ответе
+      const normalized = (data || []).map(item => ({ paid_by_customer: item.paid_by_customer || 0, co_investment_price: item.co_investment_price || 0, ...item }));
+      res.json({ success: true, orders: normalized, count: normalized.length });
     } catch (error) {
       console.error('❌ Необработанная ошибка:', error);
       res.status(500).json({ error: error.message, details: error });
