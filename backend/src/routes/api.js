@@ -7,14 +7,6 @@ const { loadAllHistory } = require('../utils/initial-loader');
 // Исправлено: async/await и обработка ошибок
 router.get('/sales', async (req, res) => {
   try {
-    // Защита: если в окружении задан SYNC_SECRET — требуем заголовок `x-sync-secret`
-    const syncSecret = process.env.SYNC_SECRET;
-    if (syncSecret) {
-      const provided = req.headers['x-sync-secret'] || req.headers['x-sync-token'];
-      if (!provided || provided !== syncSecret) {
-        return res.status(401).json({ error: 'Invalid or missing x-sync-secret header' });
-      }
-    }
     await DataController.getSales(req, res);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -71,6 +63,14 @@ router.get('/order-expenses', async (req, res) => {
 
 router.post('/sync/trigger', async (req, res) => {
   try {
+    // Защита: если в окружении задан SYNC_SECRET — требуем заголовок `x-sync-secret`
+    const syncSecret = process.env.SYNC_SECRET;
+    if (syncSecret) {
+      const provided = req.headers['x-sync-secret'] || req.headers['x-sync-token'];
+      if (!provided || provided !== syncSecret) {
+        return res.status(401).json({ error: 'Invalid or missing x-sync-secret header' });
+      }
+    }
     const { marketplace, dateFrom, dateTo, startDate, endDate } = req.body || {};
 
     // Поддерживаем разные имена полей из фронтенда (startDate/endDate) или dateFrom/dateTo
@@ -90,7 +90,9 @@ router.post('/sync/trigger', async (req, res) => {
     const job = await addSyncJob(marketplace, from, to);
     res.json({ success: true, jobId: job.id, dateFrom: from, dateTo: to });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('❌ Error in /sync/trigger:', error && (error.stack || error));
+    const body = typeof error === 'string' ? error : (error && (error.message || JSON.stringify(error))) || 'Unknown error';
+    res.status(500).json({ error: body });
   }
 });
 
