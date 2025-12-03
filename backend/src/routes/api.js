@@ -91,8 +91,15 @@ router.post('/sync/trigger', async (req, res) => {
     res.json({ success: true, jobId: job.id, dateFrom: from, dateTo: to });
   } catch (error) {
     console.error('❌ Error in /sync/trigger:', error && (error.stack || error));
-    const body = typeof error === 'string' ? error : (error && (error.message || JSON.stringify(error))) || 'Unknown error';
-    res.status(500).json({ error: body });
+    // TEMPORARY DEBUG: return full stack trace for diagnostics
+    const errorDetails = {
+      error: typeof error === 'string' ? error : (error && error.message) || 'Unknown error',
+      stack: error && error.stack ? error.stack.split('\n') : [],
+      type: error && error.constructor && error.constructor.name,
+      full: JSON.stringify(error, null, 2)
+    };
+    console.error('❌ Full error details:', errorDetails);
+    res.status(500).json({ error: 'Sync trigger failed', details: errorDetails });
   }
 });
 
